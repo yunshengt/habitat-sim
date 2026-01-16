@@ -35,32 +35,6 @@
 #  define CUDART_VERSION 0
 #endif
 
-inline int _GetComputeModeCompat(int devID, const cudaDeviceProp& deviceProp) {
-#if CUDART_VERSION >= 13000
-  int computeMode = 0;
-  checkCudaErrors(cudaDeviceGetAttribute(&computeMode,
-                                        cudaDevAttrComputeMode,
-                                        devID));
-  return computeMode;
-#else
-  (void)devID;  
-  return deviceProp.computeMode;
-#endif
-}
-
-inline int _GetClockRateKHzCompat(int devID, const cudaDeviceProp& deviceProp) {
-#if CUDART_VERSION >= 13000
-  int clockRateKHz = 0;
-  checkCudaErrors(cudaDeviceGetAttribute(&clockRateKHz,
-                                        cudaDevAttrClockRate,
-                                        devID));
-  return clockRateKHz;
-#else
-  (void)devID;
-  return deviceProp.clockRate;  // already in kHz in CUDA <= 12
-#endif
-}
-
 // Note, it is required that your SDK sample to include the proper header files,
 // please refer the CUDA examples for examples of the needed CUDA headers, which
 // may change depending on which CUDA functions are used.
@@ -1010,6 +984,32 @@ inline void __getLastCudaError(const char* errorMessage,
     DEVICE_RESET
     exit(EXIT_FAILURE);
   }
+}
+
+inline int _GetComputeModeCompat(int devID, const cudaDeviceProp& deviceProp) {
+#if CUDART_VERSION >= 13000
+  int computeMode = 0;
+  checkCudaErrors(cudaDeviceGetAttribute(&computeMode,
+                                        cudaDevAttrComputeMode,
+                                        devID));
+  return computeMode;
+#else
+  (void)devID;  
+  return deviceProp.computeMode;
+#endif
+}
+
+inline int _GetClockRateKHzCompat(int devID, const cudaDeviceProp& deviceProp) {
+#if CUDART_VERSION >= 13000
+  int clockRateKHz = 0;
+  checkCudaErrors(cudaDeviceGetAttribute(&clockRateKHz,
+                                        cudaDevAttrClockRate,
+                                        devID));
+  return clockRateKHz;
+#else
+  (void)devID;
+  return deviceProp.clockRate;  // already in kHz in CUDA <= 12
+#endif
 }
 #endif
 
