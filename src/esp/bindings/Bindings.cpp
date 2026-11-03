@@ -36,6 +36,10 @@ PYBIND11_MODULE(habitat_sim_bindings, m) {
       false;
 #endif
   m.attr("stage_id") = esp::RIGID_STAGE_ID;
+  // Marker for code that works around the rig-deletion bug fixed in
+  // BulletPhysicsManager::removeArticulatedObject (removing a skinned
+  // articulated object deleted rig `objectId`, not its own rig).
+  m.attr("skinned_ao_removal_fixed") = true;
 
   /* This function pointer is used by ESP_CHECK(). If it's null, it
      std::abort()s, if not, it calls it to cause a Python AssertionError */

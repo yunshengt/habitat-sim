@@ -1027,6 +1027,49 @@ def test_articulated_object_add_remove():
         assert art_obj_mgr.get_num_objects() == 0
 
 
+_HUMANOID_DATA = "data/humanoids/humanoid_data"
+
+
+@pytest.mark.skipif(
+    not habitat_sim.bindings.built_with_bullet,
+    reason="ArticulatedObject API requires Bullet physics.",
+)
+@pytest.mark.skipif(
+    not osp.exists(osp.join(_HUMANOID_DATA, "female_0", "female_0.urdf")),
+    reason="Requires the habitat_humanoids dataset (skinned humanoids).",
+)
+def test_skinned_articulated_object_add_remove_cycles():
+    # Skinned AOs register a rig with the RigManager, whose ids (0, 1, 2, ...) are
+    # unrelated to object ids. Removing an AO must delete that AO's own rig: deleting
+    # rig `object_id` instead freed another humanoid's bones, or re-deleted the bones
+    # of a rig whose AO was already removed: with 4 humanoids per cycle, a segfault
+    # in RigManager::deleteRigInstance on the 15th cycle.
+    cfg_settings = habitat_sim.utils.settings.default_sim_settings.copy()
+    cfg_settings["scene"] = "NONE"
+    cfg_settings["enable_physics"] = True
+    hab_cfg = habitat_sim.utils.settings.make_cfg(cfg_settings)
+
+    names = ["female_0", "male_0", "female_1", "male_1"]
+    with habitat_sim.Simulator(hab_cfg) as sim:
+        art_obj_mgr = sim.get_articulated_object_manager()
+        for _cycle in range(20):
+            aos = [
+                art_obj_mgr.add_articulated_object_from_urdf(
+                    filepath=osp.join(_HUMANOID_DATA, name, f"{name}.urdf"),
+                    fixed_base=False,
+                )
+                for name in names
+            ]
+            for ao in aos:
+                assert ao.is_alive
+                ao.motion_type = habitat_sim.physics.MotionType.KINEMATIC
+            sim.get_sensor_observations()
+            for ao in aos:
+                art_obj_mgr.remove_object_by_id(ao.object_id)
+            assert art_obj_mgr.get_num_objects() == 0
+        sim.get_sensor_observations()
+
+
 @pytest.mark.skipif(
     not habitat_sim.bindings.built_with_bullet,
     reason="ArticulatedObject API requires Bullet physics.",
