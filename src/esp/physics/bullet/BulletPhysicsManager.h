@@ -450,6 +450,13 @@ class BulletPhysicsManager : public PhysicsManager {
       DrawableGroup* drawables,
       const std::string& lightSetupKey);
 
+  /**
+   * @brief The RigManager rig id of each skinned articulated object, keyed by
+   * object id. Rig ids are allocated independently of object ids, so @ref
+   * removeArticulatedObject needs this to delete the right rig.
+   */
+  std::unordered_map<int, int> articulatedObjectRigIds_;
+
  public:
   ESP_SMART_POINTERS(BulletPhysicsManager)
 
