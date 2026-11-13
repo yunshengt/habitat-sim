@@ -120,6 +120,10 @@ void GenericDrawable::setMaterialValuesInternal(
   if (meshAttributeFlags_ & Drawable::Flag::HasVertexColor) {
     flags_ |= Mn::Shaders::PhongGL::Flag::VertexColor;
   }
+  if (materialData->hasAttribute("habitatAlphaCutoff")) {
+    flags_ |= Mn::Shaders::PhongGL::Flag::AlphaMask;
+    matCache.alphaCutoff = materialData->attribute<float>("habitatAlphaCutoff");
+  }
   // If not reset then make sure the same shader is used
   if (!reset) {
     flags_ = oldFlags;
@@ -211,6 +215,9 @@ void GenericDrawable::draw(const Mn::Matrix4& transformationMatrix,
   }
   if (flags_ >= Mn::Shaders::PhongGL::Flag::ObjectIdTexture) {
     shader_->bindObjectIdTexture(*(matCache.objectIdTexture));
+  }
+  if (flags_ & Mn::Shaders::PhongGL::Flag::AlphaMask) {
+    shader_->setAlphaMask(matCache.alphaCutoff);
   }
 
   if (skinData_) {

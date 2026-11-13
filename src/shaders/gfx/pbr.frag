@@ -19,6 +19,13 @@ void main() {
   // for lighting calcs
   PBRData pbrInfo = buildPBRData();
 
+#if defined(ALPHA_MASK)
+  // glTF alpha cutout: also skips the depth write, so depth sensors agree.
+  if (pbrInfo.baseColor.a < uAlphaMask) {
+    discard;
+  }
+#endif
+
   // Build a structure to hold the results of the direct and indirect (IBL)
   // lighting calcs
   PBRResultData colorVals = buildBaseColorResults();

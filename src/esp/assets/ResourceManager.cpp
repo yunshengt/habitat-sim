@@ -2337,6 +2337,11 @@ void ResourceManager::loadMaterials(Importer& importer,
 
       int numMaterialLayers = materialData->layerCount();
 
+      // Read glTF alpha before any material expansion below.
+      const Mn::Trade::MaterialAlphaMode importedAlphaMode =
+          materialData->alphaMode();
+      const float importedAlphaMask = materialData->alphaMask();
+
       // If we are not using the material's native shadertype, or flat
       // (Which all materials already support), expand the
       // Mn::Trade::MaterialData with appropriate data for all possible
@@ -2478,6 +2483,20 @@ void ResourceManager::loadMaterials(Importer& importer,
               *mergedCustomMaterial,
               Mn::Trade::MaterialData{
                   {}, std::move(newAttributes), std::move(newLayers)});
+
+      // Alpha cutout: drawables enable their alpha-mask shader variant when a
+      // material carries "habitatAlphaCutoff". Never added when disabled, so
+      // default behaviour is unchanged.
+      if (enableAlphaMask_ &&
+          importedAlphaMode != Mn::Trade::MaterialAlphaMode::Opaque) {
+        const float cutoff =
+            importedAlphaMode == Mn::Trade::MaterialAlphaMode::Mask
+                ? importedAlphaMask
+                : alphaBlendCutoff_;
+        finalMaterial = Mn::MaterialTools::merge(
+            *finalMaterial,
+            Mn::Trade::MaterialData{{}, {{"habitatAlphaCutoff", cutoff}}});
+      }
 
       ESP_DEBUG() << debugStr;
       // for now, just use unique ID for material key. This may change if we

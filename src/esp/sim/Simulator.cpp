@@ -158,6 +158,11 @@ void Simulator::reconfigure(const SimulatorConfiguration& cfg) {
     config_.requiresTextures = false;
   }
 
+  // Applies to materials loaded from here on (assets cached from an earlier
+  // configuration keep the alpha setting they were loaded with).
+  resourceManager_->setAlphaMask(config_.enableAlphaMask,
+                                 config_.alphaBlendCutoff);
+
   if (requiresTextures_ == Cr::Containers::NullOpt) {
     requiresTextures_ = config_.requiresTextures;
     resourceManager_->setRequiresTextures(config_.requiresTextures);
