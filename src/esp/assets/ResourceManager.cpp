@@ -3,12 +3,14 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "ResourceManager.h"
+#include <unordered_map>
 
 #include <Corrade/Containers/ArrayViewStl.h>
 #include <Corrade/Containers/BitArray.h>
 #include <Corrade/Containers/GrowableArray.h>
 #include <Corrade/Containers/Pair.h>
 #include <Corrade/Containers/PointerStl.h>
+#include <Corrade/Containers/StridedArrayView.h>
 #include <Corrade/Containers/Triple.h>
 #include <Corrade/PluginManager/Manager.h>
 #include <Corrade/PluginManager/PluginMetadata.h>
@@ -26,6 +28,7 @@
 #include <Magnum/Image.h>
 #include <Magnum/ImageView.h>
 #include <Magnum/MaterialTools/Merge.h>
+#include <Magnum/Math/Color.h>
 #include <Magnum/Math/FunctionsBatch.h>
 #include <Magnum/Math/Range.h>
 #include <Magnum/Math/Tags.h>
@@ -2721,6 +2724,101 @@ Mn::Image2D ResourceManager::convertRGBToSemanticId(
   }
   return resImage;
 }  // ResourceManager::convertRGBToSemanticId
+namespace {
+/**
+ * @brief Upload a full mip chain for an alpha-tested RGBA8 texture, keeping
+ * each level's alpha coverage (share of texels with alpha >= @p cutoff) equal
+ * to level 0. Plain box-filtered mips average sparse foliage alpha below the
+ * cutoff, so whole crowns vanish at distance. Storage must already hold
+ * log2(max size) + 1 levels.
+ */
+void uploadCoveragePreservingMips(Mn::GL::Texture2D& texture,
+                                  const Mn::Trade::ImageData2D& image,
+                                  float cutoff) {
+  const int cut = int(Mn::Math::clamp(cutoff, 0.0f, 1.0f) * 255.0f + 0.5f);
+  Mn::Vector2i size = image.size();
+  const int levels = Mn::Math::log2(size.max()) + 1;
+
+  // Tightly packed copy of level 0 (rows of the source may be padded).
+  Cr::Containers::Array<Mn::Color4ub> cur{Cr::NoInit,
+                                          std::size_t(size.product())};
+  const auto src = image.pixels<Mn::Color4ub>();
+  for (int y = 0; y != size.y(); ++y)
+    for (int x = 0; x != size.x(); ++x)
+      cur[y * size.x() + x] = src[y][x];
+
+  auto coverage = [cut](const Cr::Containers::Array<Mn::Color4ub>& px) {
+    std::size_t n = 0;
+    for (const Mn::Color4ub& c : px)
+      n += (int(c.a()) >= cut);
+    return double(n) / double(px.size());
+  };
+  const double target = coverage(cur);
+  texture.setSubImage(0, {}, image);
+
+  for (int level = 1; level < levels; ++level) {
+    const Mn::Vector2i prev = size;
+    size = Mn::Math::max(prev / 2, Mn::Vector2i{1});
+    Cr::Containers::Array<Mn::Color4ub> next{Cr::NoInit,
+                                             std::size_t(size.product())};
+    for (int y = 0; y != size.y(); ++y) {
+      const int y0 = Mn::Math::min(2 * y, prev.y() - 1);
+      const int y1 = Mn::Math::min(2 * y + 1, prev.y() - 1);
+      for (int x = 0; x != size.x(); ++x) {
+        const int x0 = Mn::Math::min(2 * x, prev.x() - 1);
+        const int x1 = Mn::Math::min(2 * x + 1, prev.x() - 1);
+        const Mn::Color4ub& a = cur[y0 * prev.x() + x0];
+        const Mn::Color4ub& b = cur[y0 * prev.x() + x1];
+        const Mn::Color4ub& c = cur[y1 * prev.x() + x0];
+        const Mn::Color4ub& d = cur[y1 * prev.x() + x1];
+        Mn::Color4ub out;
+        for (int ch = 0; ch != 4; ++ch)
+          out[ch] =
+              Mn::UnsignedByte((int(a[ch]) + b[ch] + c[ch] + d[ch] + 2) / 4);
+        next[y * size.x() + x] = out;
+      }
+    }
+
+    // Find the alpha scale whose coverage matches level 0 (histogram search).
+    std::size_t hist[256] = {};
+    for (const Mn::Color4ub& c : next)
+      ++hist[c.a()];
+    auto coverageAt = [&](double scale) {
+      std::size_t n = 0;
+      for (int v = 1; v != 256; ++v)
+        if (v * scale >= cut)
+          n += hist[v];
+      return double(n) / double(next.size());
+    };
+    double lo = 0.0, hi = 64.0, scale = 1.0;
+    if (target > 0.0 && target < 1.0 && cut > 0) {
+      for (int it = 0; it != 40; ++it) {
+        const double mid = 0.5 * (lo + hi);
+        if (coverageAt(mid) < target)
+          lo = mid;
+        else
+          hi = mid;
+      }
+      // Only boost, with a margin: a scale that lands texels exactly on the
+      // cutoff loses them to bilinear filtering with transparent neighbours.
+      scale = Mn::Math::max(hi * 1.25, 1.0);
+    }
+    Cr::Containers::Array<Mn::Color4ub> scaled{Cr::NoInit, next.size()};
+    for (std::size_t i = 0; i != next.size(); ++i) {
+      scaled[i] = next[i];
+      scaled[i].a() = Mn::UnsignedByte(
+          Mn::Math::min(255.0, Mn::Math::round(next[i].a() * scale)));
+    }
+    texture.setSubImage(
+        level, {},
+        Mn::ImageView2D{image.format(), size,
+                        Cr::Containers::arrayCast<const char>(
+                            Cr::Containers::arrayView(scaled))});
+    cur = std::move(next);  // the next level averages unscaled alpha
+  }
+}
+}  // namespace
+
 void ResourceManager::loadTextures(Importer& importer,
                                    LoadedAssetData& loadedAssetData) {
   int textureStart = nextTextureID_;
@@ -2791,6 +2889,31 @@ void ResourceManager::loadTextures(Importer& importer,
       // Whether semantic RGB or not
     }
   } else {
+    // Base-colour textures of alpha-tested materials (only with alpha cutout
+    // enabled) get coverage-preserving mips; value is the lowest cutoff using
+    // it.
+    std::unordered_map<Mn::UnsignedInt, float> alphaTestedTextures;
+    if (enableAlphaMask_) {
+      for (Mn::UnsignedInt iMat = 0; iMat < importer.materialCount(); ++iMat) {
+        Cr::Containers::Optional<Mn::Trade::MaterialData> mat =
+            importer.material(iMat);
+        if (!mat || mat->alphaMode() == Mn::Trade::MaterialAlphaMode::Opaque ||
+            !mat->hasAttribute(
+                Mn::Trade::MaterialAttribute::BaseColorTexture)) {
+          continue;
+        }
+        const Mn::UnsignedInt tex = mat->attribute<Mn::UnsignedInt>(
+            Mn::Trade::MaterialAttribute::BaseColorTexture);
+        const float cutoff =
+            mat->alphaMode() == Mn::Trade::MaterialAlphaMode::Mask
+                ? mat->alphaMask()
+                : alphaBlendCutoff_;
+        auto found = alphaTestedTextures.find(tex);
+        if (found == alphaTestedTextures.end() || cutoff < found->second) {
+          alphaTestedTextures[tex] = cutoff;
+        }
+      }
+    }
     for (uint32_t iTexture = 0; iTexture < importer.textureCount();
          ++iTexture) {
       auto currentTextureID = textureStart + iTexture;
@@ -2857,6 +2980,17 @@ void ResourceManager::loadTextures(Importer& importer,
             generateMipmap = true;
           } else {
             currentTexture->setStorage(levelCount, format, image->size());
+          }
+        }
+
+        if (generateMipmap && (image->format() == Mn::PixelFormat::RGBA8Unorm ||
+                               image->format() == Mn::PixelFormat::RGBA8Srgb)) {
+          const auto alphaTested = alphaTestedTextures.find(iTexture);
+          if (alphaTested != alphaTestedTextures.end()) {
+            uploadCoveragePreservingMips(*currentTexture, *image,
+                                         alphaTested->second);
+            generateMipmap = false;
+            continue;
           }
         }
 
