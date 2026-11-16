@@ -109,6 +109,19 @@ struct SimulatorConfiguration {
    */
   bool enableHBAO = false;
 
+  /**
+   * @brief Honour glTF alpha as a cutout: discard texels whose alpha is below
+   * a cutoff, in both colour and depth. MASK materials use their own
+   * alphaCutoff; BLEND materials use @ref alphaBlendCutoff (no sorted
+   * blending). Off by default so existing renders are unchanged.
+   */
+  bool enableAlphaMask = false;
+
+  /**
+   * @brief Cutoff applied to BLEND materials when @ref enableAlphaMask is set.
+   */
+  float alphaBlendCutoff = 0.5f;
+
   ESP_SMART_POINTERS(SimulatorConfiguration)
 };
 

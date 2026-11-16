@@ -531,6 +531,15 @@ class ResourceManager {
   inline void setRequiresTextures(bool newVal) { requiresTextures_ = newVal; }
 
   /**
+   * @brief Enable glTF alpha cutout for materials loaded after this call.
+   * MASK uses the material's alphaCutoff, BLEND uses @p blendCutoff.
+   */
+  inline void setAlphaMask(bool enable, float blendCutoff) {
+    enableAlphaMask_ = enable;
+    alphaBlendCutoff_ = blendCutoff;
+  }
+
+  /**
    * @brief Set a replay recorder so that ResourceManager can notify it about
    * render assets.
    */
@@ -1320,6 +1329,12 @@ class ResourceManager {
    * @brief Flag to load textures of meshes
    */
   bool requiresTextures_ = true;
+
+  /** @brief Whether imported glTF alpha is honoured as a cutout. */
+  bool enableAlphaMask_ = false;
+
+  /** @brief Cutoff used for BLEND materials when @ref enableAlphaMask_. */
+  float alphaBlendCutoff_ = 0.5f;
 
   /**
    * @brief See @ref setRecorder.

@@ -258,6 +258,7 @@ PbrShader::PbrShader(const Configuration& config)
 
       .addSource(flags_ >= Flag::DebugDisplay ? "#define PBR_DEBUG_DISPLAY\n"
                                               : "")
+      .addSource(flags_ >= Flag::AlphaMask ? "#define ALPHA_MASK\n" : "")
 
       .addSource(
           Cr::Utility::formatString("#define LIGHT_COUNT {}\n", lightCount_))
@@ -423,6 +424,9 @@ PbrShader::PbrShader(const Configuration& config)
   // for debug info
   if (flags_ >= Flag::DebugDisplay) {
     pbrDebugDisplayUniform_ = uniformLocation("uPbrDebugDisplay");
+  }
+  if (flags_ >= Flag::AlphaMask) {
+    alphaMaskUniform_ = uniformLocation("uAlphaMask");
   }
 
   /////////////////////////////
@@ -773,6 +777,15 @@ PbrShader& PbrShader::setPbrEquationScales(const PbrEquationScales& scales) {
                                 scales.iblDiffuse, scales.iblSpecular};
     setUniform(componentScalesUniform_, componentScales);
   }
+  return *this;
+}
+
+PbrShader& PbrShader::setAlphaMask(float cutoff) {
+  CORRADE_ASSERT(flags_ >= Flag::AlphaMask,
+                 "PbrShader::setAlphaMask(): the shader was not "
+                 "created with AlphaMask enabled",
+                 *this);
+  setUniform(alphaMaskUniform_, cutoff);
   return *this;
 }
 

@@ -31,6 +31,8 @@ class PbrDrawable : public Drawable {
     Mn::Matrix3 textureMatrix{};
 
     Mn::GL::Texture2D* baseColorTexture = nullptr;
+    // Alpha cutoff when the material carries "habitatAlphaCutoff".
+    float alphaCutoff = 0.5f;
 
     /**
      * Currently we only support a single noneRoughnessMetallicTexture texture

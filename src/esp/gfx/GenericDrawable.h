@@ -33,6 +33,8 @@ class GenericDrawable : public Drawable {
     Mn::GL::Texture2D* specularTexture = nullptr;
     Mn::GL::Texture2D* normalTexture = nullptr;
     Mn::GL::Texture2D* objectIdTexture = nullptr;
+    // Alpha cutoff when the material carries "habitatAlphaCutoff".
+    float alphaCutoff = 0.5f;
 
   };  // GenericMaterialCache
 

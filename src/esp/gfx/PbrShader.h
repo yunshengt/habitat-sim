@@ -357,9 +357,12 @@ class PbrShader : public Magnum::GL::AbstractShaderProgram {
      * PbrDebugDisplay in the fragment shader for debugging
      */
     DebugDisplay = 1ULL << 37,
-    /*
-     * TODO: alphaMask
+
+    /**
+     * Discard fragments whose base-colour alpha is below the value set with
+     * @ref setAlphaMask() (glTF MASK; BLEND approximated as a cutout).
      */
+    AlphaMask = 1ULL << 38,
   };
 
   /**
@@ -826,6 +829,11 @@ class PbrShader : public Magnum::GL::AbstractShaderProgram {
    */
   PbrShader& setDebugDisplay(PbrDebugDisplay index);
 
+  /**
+   * @brief Set the alpha cutoff. Requires @ref Flag::AlphaMask.
+   */
+  PbrShader& setAlphaMask(float cutoff);
+
  protected:
   Flags flags_;
   Magnum::UnsignedInt lightCount_{};
@@ -862,6 +870,7 @@ class PbrShader : public Magnum::GL::AbstractShaderProgram {
   int normalMatrixUniform_ = ID_UNDEFINED;
   int projMatrixUniform_ = ID_UNDEFINED;
   int baseColorUniform_ = ID_UNDEFINED;  // diffuse color
+  int alphaMaskUniform_ = ID_UNDEFINED;  // alpha cutoff
   int roughnessUniform_ = ID_UNDEFINED;  // roughness of a surface
   int metallicUniform_ = ID_UNDEFINED;
   int iorUniform_ = ID_UNDEFINED;

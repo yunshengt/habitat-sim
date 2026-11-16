@@ -109,6 +109,10 @@ void PbrDrawable::setMaterialValuesInternal(
   if (materialData->isDoubleSided()) {
     flags_ |= PbrShader::Flag::DoubleSided;
   }
+  if (materialData->hasAttribute("habitatAlphaCutoff")) {
+    flags_ |= PbrShader::Flag::AlphaMask;
+    matCache.alphaCutoff = materialData->attribute<float>("habitatAlphaCutoff");
+  }
 
   ////////////////
   // ClearCoat layer
@@ -515,6 +519,10 @@ void PbrDrawable::draw(const Mn::Matrix4& transformationMatrix,
       .setMetallic(matCache.metalness)
       .setIndexOfRefraction(matCache.ior_Index)
       .setEmissiveColor(matCache.emissiveColor);
+
+  if (flags_ >= PbrShader::Flag::AlphaMask) {
+    shader_->setAlphaMask(matCache.alphaCutoff);
+  }
 
   if (flags_ >= PbrShader::Flag::BaseColorTexture) {
     shader_->bindBaseColorTexture(*matCache.baseColorTexture);

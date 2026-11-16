@@ -102,6 +102,12 @@ void initSimConfigBindings(py::module& m) {
       .def_readwrite(
           "enable_hbao", &SimulatorConfiguration::enableHBAO,
           R"(Whether or not to enable horizon-based ambient occlusion, which provides soft shadows in corners and crevices.)")
+      .def_readwrite(
+          "enable_alpha_mask", &SimulatorConfiguration::enableAlphaMask,
+          R"(Honour glTF alpha as a cutout (discard texels below a cutoff) in colour and depth. MASK materials use their alphaCutoff; BLEND materials use alpha_blend_cutoff. Default False.)")
+      .def_readwrite(
+          "alpha_blend_cutoff", &SimulatorConfiguration::alphaBlendCutoff,
+          R"(Alpha cutoff applied to BLEND materials when enable_alpha_mask is set. Default 0.5.)")
       .def(py::self == py::self)
       .def(py::self != py::self);
 

@@ -31,6 +31,10 @@ uniform highp vec3 uCameraWorldPos;
 uniform int uPbrDebugDisplay;
 #endif
 
+#if defined(ALPHA_MASK)
+uniform float uAlphaMask;
+#endif
+
 /////////////////////
 // DEBUG - disable calcs only
 // define these macros to disable layer calculations for debugging or perf tests
